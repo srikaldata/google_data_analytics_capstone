@@ -1,0 +1,429 @@
+---
+title: "Capstone report"
+author: "srikal"
+date: "2025-01-31"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+# Bellabeat market trend ID using competitor -- A Report
+
+
+## 1. Business task
+
+### 1. a) Problem definition
+In this report we explored a competitor device to identify trends in smart device usage, gain insights, which will help Bellabeat s marketing team to focus on customers using their 5 products. The scope of this report lies within the set of data previously collected. Also, The data-driven suggestions will ONLY aid in tactical decisions (NOT strategical decisions).
+
+
+### 1. b) Higher level goals
+* The identified leads should assist Bellabeat s marketing team to focus on current and potential customers. 
+* The findings must help in devising ad campaigns or other marketing strategies in the near future.
+
+### 1.c) About the company
+
+#### Products:
+* __Bellabeat app__ --> app on smartphone 
+* __Leaf__ --> wellness tracker
+* __Time__ --> wellness watch
+* __Spring__ --> smart water bottle
+* __Bellabeat membership__ --> subscription, personalized guidance in health+lifestyle goals
+
+
+# 2. Details about the data used
+
+### 2. a) Metadata about the data
+Source location: Kaggle  
+Source device that collected the data: FitBit  
+URL: https://www.kaggle.com/code/irenashen1/capstone-bellabeat-case-study-r  
+Files source format: .csv (comma separated values)  
+Raw files: Available  
+
+
+
+
+### 2. b) Data exploration
+
+
+#### importing necessary packages
+```{r eval=FALSE, include=FALSE}
+install.packages('tidyverse') 
+install.packages('janitor') 
+install.packages('lubridate')
+install.packages('sqldf')
+install.packages('dplyr')
+install.packages('ggplot2')
+install.packages('tidyr')
+```
+
+
+```{r echo=TRUE}
+
+library(tidyverse) # universal tool for data analysis
+library(lubridate) # typecasting date types
+library(janitor)  # cleaning the data
+library(dplyr) # for data manipulation
+library(ggplot2) # for plotting the results
+library(tidyr) # cleaning the data
+library(sqldf) # for SQL operations (if needed)
+library(purrr) # checking null values
+```
+  
+#### importing the data
+
+```{r echo=TRUE}
+daily_activity <- read_csv(file= "/kaggle/input/google-data-analytics-capstone-dataset/working_bellabeat_dataset/mturkfitbit_export_4.12.16-5.12.16/Fitabase Data 4.12.16-5.12.16/dailyActivity_merged.csv") 
+daily_calories <- read_csv(file= "/kaggle/input/google-data-analytics-capstone-dataset/working_bellabeat_dataset/mturkfitbit_export_4.12.16-5.12.16/Fitabase Data 4.12.16-5.12.16/dailyCalories_merged.csv") 
+daily_intensities <- read_csv(file= "/kaggle/input/google-data-analytics-capstone-dataset/working_bellabeat_dataset/mturkfitbit_export_4.12.16-5.12.16/Fitabase Data 4.12.16-5.12.16/dailyIntensities_merged.csv")
+
+sleep <- read_csv(file= "/kaggle/input/google-data-analytics-capstone-dataset/working_bellabeat_dataset/mturkfitbit_export_4.12.16-5.12.16/Fitabase Data 4.12.16-5.12.16/sleepDay_merged.csv")
+weight <- read_csv(file= "/kaggle/input/google-data-analytics-capstone-dataset/working_bellabeat_dataset/mturkfitbit_export_4.12.16-5.12.16/Fitabase Data 4.12.16-5.12.16/weightLogInfo_merged.csv")
+
+```
+
+  
+#### cleaning column names
+
+```{r}
+daily_activity <- clean_names(daily_activity)
+daily_calories <-  clean_names(daily_calories)
+daily_intensities <- clean_names(daily_intensities)
+
+sleep <- clean_names(sleep)
+weight <- clean_names(weight)
+
+```
+
+
+
+#### viewing the datasets
+We can identify that the 'id' column is the key column
+```{r echo=FALSE}
+
+colnames(daily_activity)
+summary(daily_activity)
+
+colnames(daily_calories)
+colnames(daily_intensities)
+
+
+colnames(sleep)
+colnames(weight)
+```
+We can move on to identify if the dataframes have the same number of ids  
+  
+Number of participatnt data in each dataframe:
+```{r echo=FALSE}
+n_distinct(daily_activity$id)
+n_distinct(daily_calories$id)
+n_distinct(daily_intensities$id)
+
+n_distinct(sleep$id)
+n_distinct(weight$id)
+```
+Notice that the sleep and weight data is available for fewer participants.  
+So the sample size is 33. It is quite low but it can provide a headstart.
+
+
+
+#### Findings from observing the datasets:
+* raw datasets are available in .csv formats
+* data is organized: Wide format data of different participants are merged into a long format
+
+##### **Caution** ***ASSUMPTIONS*** :
+* dataset is procured from a 3rd party, provided the assurances made by them, the dataset is reliable, original, ASSUMED comprehensive (still the contextuality of the collection process is missing), NOT current, cited
+* the data at hand can only serve to target customer based on their activity levels.
+* further anlaysis from the data from different smart devices are needed to be accurate
+* the sample size is also low. 
+
+#### 2. c) Data exploration - takeaway:
+the results of the analysis will only be a starting point.The results are NOT applicable on the long run
+
+
+Now we can move ahead to process the data.
+
+
+## 3. Data processing
+
+### 3. a) finding out discrepancies 
+  
+####  checking for null values
+
+Out of the 5 dataframes, only the "weight" dataframe s "fat" column has __65__ null values 
+```{r}
+na_counts <- daily_calories %>% map(~ sum(is.na(.)))
+print(na_counts)
+print(na_counts$fat)
+
+rows_with_na <- weight %>% filter(if_any(everything(), is.na))
+print(rows_with_na)
+print(na_counts$fa/nrow(weight)*100)
+```
+We can notice that almost 97 % of the values in the 'weight' dataframe s 'fat' column is NULL.  
+So, we can drop that column
+
+```{r}
+weight <- weight[,-5]
+colnames(weight)
+```
+
+#### checking the types and type casting if needed
+
+```{r include=FALSE}
+sapply(daily_activity, class)
+sapply(daily_calories, class)
+sapply(daily_intensities, class)
+sapply(sleep, class)
+sapply(weight, class)
+```
+
+The date columns in each dataframe has a datatype 'character'.  
+  
+We need to convert cast type date into date or datetime respectively
+
+```{r}
+daily_activity$activity_date <- mdy(daily_activity$activity_date)
+daily_calories$activity_date <- mdy(daily_calories$activity_day)
+daily_intensities$activity_day <- mdy(daily_intensities$activity_day)
+
+sleep$sleep_day <- mdy_hms(sleep$sleep_day)
+weight$date <- mdy_hms(weight$date)
+```
+
+
+```{r eval=FALSE, include=FALSE}
+sapply(daily_activity, class)
+sapply(daily_calories, class)
+sapply(daily_intensities, class)
+sapply(sleep, class)
+sapply(weight, class)
+```
+ONLY dates and datetime columns were reassigned correct datatypes  
+other columns already had the correct datatypes
+  
+#### subsetting needed data in a new df
+```{r}
+daily_activity %>%  
+  select(id,total_steps,total_distance,very_active_minutes,calories) %>%
+  summary()
+
+# storing it in the df for analysis
+
+# separating active distances
+activity_distance_cat<- daily_activity[c('id', 'activity_date', 'total_steps', 'total_distance', 'very_active_distance', 'moderately_active_distance', 'light_active_distance', 'sedentary_active_distance')]
+head(activity_distance_cat)
+
+
+# separating active minutes
+activity_minutes_cat =daily_activity[c('id', 'activity_date', 'total_steps', 'total_distance', 'very_active_minutes', 'fairly_active_minutes', 'lightly_active_minutes', 'sedentary_minutes','calories')]
+
+# calculating total active minutes
+activity_minutes_cat <- activity_minutes_cat %>% mutate(total_active_minutes=very_active_minutes+fairly_active_minutes+lightly_active_minutes)
+str(activity_minutes_cat)
+
+
+# segregating calories as a separate dataframe
+activity_calories = daily_activity[c('id', 'activity_date', 'calories')]
+colnames(activity_calories)
+
+
+# inner joining sleep and activity minutes
+sleep_activitymins_merged <- merge(x=sleep, y=activity_minutes_cat, by.x=c('id', 'sleep_day'), by.y=c('id','activity_date'))
+head(sleep_activitymins_merged)
+
+```
+#### Findings after data exploration  
+* lubridate, janitor, dplyr, null were used wwithin R
+* SQL and spreadsheets were not used but can be used since the data set is not large
+* null column was only present in the weight dataframe. the particular column was dropped
+* datasets were cleaned, type casted, combined, filtered and is ready for analysis
+
+
+
+### 3. b) Data processing - Takeaway
+The dataset is not quite large and necessary cleaning has been performed and completed. The scope for analysis is low because of the variability of the given data. It may not represent the true population
+
+
+
+## 4. Analysis and Visualization
+
+
+### 4. a) finding out relations between sleep and exercise
+
+```{r include=FALSE}
+sleep_activitymins_merged <- sleep_activitymins_merged %>% mutate(percent_asleep=(total_minutes_asleep/total_time_in_bed))
+
+
+# grouping all sleep related metric per person
+grouped_sleep <- sleep_activitymins_merged %>% 
+  filter(total_active_minutes>0 & total_steps>100) %>% 
+  group_by(id) %>%
+  summarize(mean_percent_asleep = mean(percent_asleep), mean_total_active_mins=mean(total_active_minutes), mean_total_steps=mean(total_steps))
+                                        
+str(grouped_sleep)
+glimpse(grouped_sleep)
+summary(grouped_sleep)
+n_distinct(grouped_sleep)
+```
+
+
+
+Now we can find if sleep is correlated with other metrics
+```{r}
+cor(grouped_sleep)
+```
+The correlation between sleep and active_mins/total_steps looks very weak.  
+
+This is worth exploring!
+
+
+```{r}
+ggplot(data=grouped_sleep)+
+  geom_point(mapping=aes(x=mean_total_active_mins, y=mean_percent_asleep))+
+  labs(title='people who are more active usually sleeps well', subtitle='are the readings accurate?')
+  
+```
+
+```{r}
+ggplot(data=grouped_sleep)+
+  geom_point(mapping=aes(x=mean_total_steps, y=mean_percent_asleep))+
+  labs(title="people who walk more steps ought to sleep well --> but readings differ", subtitle="strike 2 for competitor's inaccuracy")
+```
+
+
+
+
+```{r}
+ggplot(data=sleep_activitymins_merged)+
+  geom_point(mapping=aes(x=percent_asleep, y=total_active_minutes, color=total_sleep_records))+
+  labs(title=" exercise more <==> sleep more --> but readings indicate differently", subtitle="strike 3 for competitor's inaccuracy")
+```
+
+It looks like the time slept recorded is not correlated with active minute or number of steps (which are proxies for exercise levels)  
+
+
+This means that the device that was used to measure did NOT record/report correctly.  
+
+
+
+THIS IS A __MARKET OPPORTUNITY__ FOR BELLABEAT  
+
+
+This is a hypothesis that is worth testing in the future with more representative data becomes available
+
+
+
+### 4. b) weight input by user
+
+```{r}
+
+count_available <- table(weight$is_manual_report)
+count_available["FALSE"]
+weight %>% group_by(is_manual_report) %>%
+  summarize(N=n()) %>%
+  ggplot(aes(x=is_manual_report, y=N, fill=is_manual_report))+
+  geom_bar(stat='identity')+
+  geom_text(aes(label=N),vjust=2,fontface='bold',size=12)+
+  labs(title='did people report their weights manually?')
+
+
+```
+
+
+Since many people are self-reporting there is a high possibility for error.  
+
+Also, it indicates they may not have a device that auto-records their weights    
+
+Almost __61.194 %__ only self reports their weight 
+
+This is also a good market opportunity that BELLABEAT needs to explore  
+
+
+
+### 4. c) knowing about the users from the colaries burnt
+
+
+```{r}
+
+# removing the calories burnt less than 750 since it is a reasonable threshold
+# if a person forgot to wear the device
+activity_calories %>% filter(calories>=750) %>% group_by(id) %>% summarize(mean_cal=mean(calories)) %>%
+  ggplot(aes(x=mean_cal, fill=mean_cal))+
+  geom_density(color='black',fill='navyblue', alpha=0.5)+
+  labs(title='distribution of CALORIES BURNT across the 33 users')
+```
+
+according to:  
+https://www.medicalnewstoday.com/articles/319731  
+https://www.webmd.com/fitness-exercise/how-many-calories-do-i-burn-in-a-day  
+  
+  
+Average calories burnt by an average person:  
+  
+1,300 to 2,000 calories per day for women  
+2,000 to 2,450 calories per day for men  
+  
+the peak of CALORIES BURNT distribution reaches here at around 2000 cals with a right-tail skew  
+
+
+```{r}
+weight %>% filter(weight_kg>=20) %>% group_by(id) %>% summarize(mean_bmi=mean(bmi)) %>%
+  ggplot(aes(x=mean_bmi, fill=mean_bmi))+
+  geom_histogram(color='black',fill='red', alpha=0.5)+
+  labs(title='distribution of BMI across 8 users', subtitle= 'in the given sample, most users using fitbit (competitor device) range between 20 to 30 bmi')
+```
+
+According to  
+https://www.cdc.gov/bmi/adult-calculator/bmi-categories.html  
+  
+Underweight -->	Less than 18.5  
+Normal Weight -->	18.5 to 24.9  
+Overweight	--> 25.0 to 29.9  
+Obesity Class I	--> 30.0 to 34.9  
+Obesity Class II --> 	35.0 to 39.9  
+Obesity Class III	--> 40.0 and above  
+
+7 out of 8 people who uses this competitor s smart device are between normal to overweight   
+  
+
+***ASSUMPTION***:
+* provided the data is randomly sampled  
+* provided the sample is representative of the population  
+* provided no hawthorne effect is observed when wearing the smart device  
+
+if all the above assumptions are proved to be true  
+--> from the distributions  
+--> we can observe that the smart device is used by people who are approximately on normal bmi who are not sedentary  
+    
+if investigated further, there is a possiblity for a huge market opportunity to target customersas follows:  
+* people who want to gain weight and need feedback about their health metrics  
+* people who want to lose weight and need feedback about their health metrics  
+
+if these markets are untapped by other competitors as well, Bellabeat can target customer acquisitions
+
+
+## 5. Action plan
+
+Based on the findings these are the prioritized steps backed by the initial research:  
+  
+1. __Market with the wins in the 'accuracy' games__   
+the competitor s device ***did NOT accurately record/process sleep and activity data***.  
+If we can establish accuracy as one of the major goals of Bellabeat s products (especially in tracking sleep and activity). We can compete with our competitors head-to-head.  
+  
+2. __Opportunity to acquire underweight and obese users__  
+__7 out of 8__ users using fitbit range between __20 to 30 bmi__. Also, __among the 33 users sampled, the distribution of calories burnt peaks at around 2000 and has a right tail skewed till 3400 calories__. So, we need to explore this space with further experiments. If successful, under the assumptions stated earlier, the marketing team can explore rest of the market. Also, to accelerate acquisition in these domains, partnering with OR marketing at health-based institutions can provide an edge to compete with the big firms.  
+  
+3. __Bellabeat s USP = auto-recording__
+despite the accuracy flaws in fitbit, __61.194 % users self reports their weight.This is a customer pain point that Bellabeat can take advantage of. If we could market, Leaf's and Spring's nature to auto-record as a major USP, there is a possibility to acquire the users churning from fitbit. Since Bellabeat has a wide range of devices already, any device further designed should NOT require the users to self-report any type of data (except when signing up). This needs further research as well  
+
+
+Thank You!  
+  
+Please reach out for further questions.  
+  
+  
+
