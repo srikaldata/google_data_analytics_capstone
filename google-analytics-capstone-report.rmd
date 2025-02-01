@@ -34,7 +34,7 @@ In this report we explored a competitor device to identify trends in smart devic
 * __Bellabeat membership__ --> subscription, personalized guidance in health+lifestyle goals
 
 
-# 2. Details about the data used
+## 2. Details about the data used
 
 ### 2. a) Metadata about the data
 Source location: Kaggle  
