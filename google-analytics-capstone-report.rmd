@@ -24,7 +24,7 @@ In this report we explored a competitor device to identify trends in smart devic
 * The identified leads should assist Bellabeat s marketing team to focus on current and potential customers. 
 * The findings must help in devising ad campaigns or other marketing strategies in the near future.
 
-### 1.c) About the company
+### 1. c) About the company
 
 #### Products:
 * __Bellabeat app__ --> app on smartphone 
